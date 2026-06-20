@@ -1,0 +1,17 @@
+namespace MarketplaceOutsourcing.Domain.Common;
+
+public abstract class BaseEntity
+{
+    public Guid Id { get; protected init; } = Guid.NewGuid();
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not BaseEntity other) return false;
+        if (ReferenceEquals(this, other)) return true;
+        if (GetType() != other.GetType()) return false;
+
+        return Id == other.Id;
+    }
+
+    public override int GetHashCode() => Id.GetHashCode();
+}
