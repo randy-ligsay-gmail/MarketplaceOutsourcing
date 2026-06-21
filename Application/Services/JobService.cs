@@ -1,5 +1,6 @@
 namespace MarketplaceOutsourcing.Application.Services;
 
+using MarketplaceOutsourcing.Application.Caching;
 using MarketplaceOutsourcing.Application.Interfaces;
 using MarketplaceOutsourcing.Domain.Entities;
 using MarketplaceOutsourcing.Domain.Enums;
@@ -8,15 +9,42 @@ using MarketplaceOutsourcing.Domain.Exceptions;
 public class JobService
 {
     private readonly IJobRepository _jobRepository;
+    private readonly ILruCache _cache;
 
-    public JobService(IJobRepository jobRepository)
+    public JobService(IJobRepository jobRepository, ILruCache cache)
     {
         _jobRepository = jobRepository;
+        _cache = cache;
     }
 
-    public IReadOnlyList<Job> ListJobs() => _jobRepository.GetAll();
+    public IReadOnlyList<Job> ListJobs()
+    {
+        if (_cache.TryGet(CacheKeys.JobsAll, out IReadOnlyList<Job>? cached) && cached is not null)
+        {
+            return cached;
+        }
 
-    public Job? GetJob(Guid id) => _jobRepository.GetById(id);
+        var jobs = _jobRepository.GetAll();
+        _cache.Set(CacheKeys.JobsAll, jobs);
+        return jobs;
+    }
+
+    public Job? GetJob(Guid id)
+    {
+        var cacheKey = CacheKeys.JobById(id);
+        if (_cache.TryGet(cacheKey, out Job? cached))
+        {
+            return cached;
+        }
+
+        var job = _jobRepository.GetById(id);
+        if (job is not null)
+        {
+            _cache.Set(cacheKey, job);
+        }
+
+        return job;
+    }
 
     public IReadOnlyList<Job> SearchOpenJobs(string searchTerm)
     {
@@ -25,7 +53,16 @@ public class JobService
             return Array.Empty<Job>();
         }
 
-        return _jobRepository.SearchOpenJobs(searchTerm.Trim());
+        var normalizedTerm = searchTerm.Trim();
+        var cacheKey = CacheKeys.JobsSearch(normalizedTerm);
+        if (_cache.TryGet(cacheKey, out IReadOnlyList<Job>? cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var jobs = _jobRepository.SearchOpenJobs(normalizedTerm);
+        _cache.Set(cacheKey, jobs);
+        return jobs;
     }
 
     public (bool Success, Job? Job, string? ErrorMessage) CreateJob(
@@ -58,6 +95,7 @@ public class JobService
 
         var job = new Job(title, description, customerId, startDate, dueDate, budget);
         _jobRepository.Add(job);
+        InvalidateJobCache();
         return (true, job, null);
     }
 
@@ -79,6 +117,7 @@ public class JobService
         {
             job.UpdateDetails(title, description, startDate, dueDate, budget);
             _jobRepository.SaveChanges();
+            InvalidateJobCache();
             return (true, job, null);
         }
         catch (DomainException ex)
@@ -99,11 +138,18 @@ public class JobService
         {
             job.Cancel();
             _jobRepository.SaveChanges();
+            InvalidateJobCache();
             return (true, null);
         }
         catch (DomainException ex)
         {
             return (false, ex.Message);
         }
+    }
+
+    private void InvalidateJobCache()
+    {
+        _cache.RemoveByPrefix(CacheKeys.JobsPrefix);
+        _cache.RemoveByPrefix(CacheKeys.JobOffersPrefix);
     }
 }

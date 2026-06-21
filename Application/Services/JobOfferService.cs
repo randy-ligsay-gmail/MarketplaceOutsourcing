@@ -1,5 +1,6 @@
 namespace MarketplaceOutsourcing.Application.Services;
 
+using MarketplaceOutsourcing.Application.Caching;
 using MarketplaceOutsourcing.Application.Interfaces;
 using MarketplaceOutsourcing.Domain.Entities;
 using MarketplaceOutsourcing.Domain.Enums;
@@ -10,22 +11,61 @@ public class JobOfferService
     private readonly IJobRepository _jobRepository;
     private readonly IJobOfferRepository _jobOfferRepository;
     private readonly IContractorRepository _contractorRepository;
+    private readonly ILruCache _cache;
 
     public JobOfferService(
         IJobRepository jobRepository,
         IJobOfferRepository jobOfferRepository,
-        IContractorRepository contractorRepository)
+        IContractorRepository contractorRepository,
+        ILruCache cache)
     {
         _jobRepository = jobRepository;
         _jobOfferRepository = jobOfferRepository;
         _contractorRepository = contractorRepository;
+        _cache = cache;
     }
 
-    public IReadOnlyList<JobOffer> ListOffers() => _jobOfferRepository.GetAll();
+    public IReadOnlyList<JobOffer> ListOffers()
+    {
+        if (_cache.TryGet(CacheKeys.JobOffersAll, out IReadOnlyList<JobOffer>? cached) && cached is not null)
+        {
+            return cached;
+        }
 
-    public JobOffer? GetOffer(Guid id) => _jobOfferRepository.GetById(id);
+        var offers = _jobOfferRepository.GetAll();
+        _cache.Set(CacheKeys.JobOffersAll, offers);
+        return offers;
+    }
 
-    public IReadOnlyList<JobOffer> GetOffersForJob(Guid jobId) => _jobOfferRepository.GetByJobId(jobId);
+    public JobOffer? GetOffer(Guid id)
+    {
+        var cacheKey = CacheKeys.JobOfferById(id);
+        if (_cache.TryGet(cacheKey, out JobOffer? cached))
+        {
+            return cached;
+        }
+
+        var offer = _jobOfferRepository.GetById(id);
+        if (offer is not null)
+        {
+            _cache.Set(cacheKey, offer);
+        }
+
+        return offer;
+    }
+
+    public IReadOnlyList<JobOffer> GetOffersForJob(Guid jobId)
+    {
+        var cacheKey = CacheKeys.JobOffersByJob(jobId);
+        if (_cache.TryGet(cacheKey, out IReadOnlyList<JobOffer>? cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var offers = _jobOfferRepository.GetByJobId(jobId);
+        _cache.Set(cacheKey, offers);
+        return offers;
+    }
 
     public (bool Success, JobOffer? Offer, string? ErrorMessage) CreateOffer(
         Guid jobId,
@@ -67,6 +107,7 @@ public class JobOfferService
         {
             var offer = new JobOffer(jobId, contractorId, price);
             _jobOfferRepository.Add(offer);
+            InvalidateOfferCache(jobId);
             return (true, offer, null);
         }
         catch (DomainException ex)
@@ -87,6 +128,7 @@ public class JobOfferService
         {
             offer.UpdatePrice(price);
             _jobOfferRepository.SaveChanges();
+            InvalidateOfferCache(offer.JobId);
             return (true, offer, null);
         }
         catch (DomainException ex)
@@ -107,6 +149,7 @@ public class JobOfferService
         {
             offer.Withdraw();
             _jobOfferRepository.SaveChanges();
+            InvalidateOfferCache(offer.JobId);
             return (true, null);
         }
         catch (DomainException ex)
@@ -155,11 +198,20 @@ public class JobOfferService
             _jobRepository.SaveChanges();
             _jobOfferRepository.SaveChanges();
 
+            InvalidateOfferCache(job.Id);
+            _cache.RemoveByPrefix(CacheKeys.JobsPrefix);
+
             return (true, job, null);
         }
         catch (DomainException ex)
         {
             return (false, null, ex.Message);
         }
+    }
+
+    private void InvalidateOfferCache(Guid jobId)
+    {
+        _cache.RemoveByPrefix(CacheKeys.JobOffersPrefix);
+        _cache.Remove(CacheKeys.JobById(jobId));
     }
 }

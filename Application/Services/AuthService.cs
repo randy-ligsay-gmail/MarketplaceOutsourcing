@@ -1,3 +1,4 @@
+using MarketplaceOutsourcing.Application.Caching;
 using MarketplaceOutsourcing.Application.Interfaces;
 using MarketplaceOutsourcing.Domain.Entities;
 
@@ -10,19 +11,22 @@ public class AuthService
     private readonly IContractorRepository _contractorRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly ILruCache _cache;
 
     public AuthService(
         IUserRepository userRepository,
         ICustomerRepository customerRepository,
         IContractorRepository contractorRepository,
         IPasswordHasher passwordHasher,
-        IJwtTokenService jwtTokenService)
+        IJwtTokenService jwtTokenService,
+        ILruCache cache)
     {
         _userRepository = userRepository;
         _customerRepository = customerRepository;
         _contractorRepository = contractorRepository;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
+        _cache = cache;
     }
 
     public (bool Success, AuthResult? Result, string? ErrorMessage) Login(string email, string password)
@@ -72,6 +76,7 @@ public class AuthService
 
         var user = User.CreateCustomer(email, _passwordHasher.Hash(password), customer.Id);
         _userRepository.Add(user);
+        _cache.RemoveByPrefix(CacheKeys.CustomersPrefix);
 
         return (true, BuildAuthResult(user), null);
     }
@@ -112,6 +117,7 @@ public class AuthService
 
         var user = User.CreateContractor(email, _passwordHasher.Hash(password), contractor.Id);
         _userRepository.Add(user);
+        _cache.RemoveByPrefix(CacheKeys.ContractorsPrefix);
 
         return (true, BuildAuthResult(user), null);
     }

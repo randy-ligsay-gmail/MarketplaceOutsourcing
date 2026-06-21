@@ -2,6 +2,7 @@ using MarketplaceOutsourcing.Application.Interfaces;
 using MarketplaceOutsourcing.Application.Services;
 using MarketplaceOutsourcing.Domain.Constants;
 using MarketplaceOutsourcing.Infrastructure.Auth;
+using MarketplaceOutsourcing.Infrastructure.Caching;
 using MarketplaceOutsourcing.Infrastructure.Persistence;
 using MarketplaceOutsourcing.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -31,6 +32,9 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, HttpCurrentUserService>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+        services.Configure<LruCacheSettings>(configuration.GetSection(LruCacheSettings.SectionName));
+        services.AddSingleton<ILruCache, LruCache>();
 
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
