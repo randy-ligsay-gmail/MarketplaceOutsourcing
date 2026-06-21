@@ -1,6 +1,9 @@
 using MarketplaceOutsourcing.Api.Dtos;
 using MarketplaceOutsourcing.Api.Mapping;
+using MarketplaceOutsourcing.Application.Interfaces;
 using MarketplaceOutsourcing.Application.Services;
+using MarketplaceOutsourcing.Domain.Constants;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MarketplaceOutsourcing.Api.Controllers;
@@ -10,12 +13,15 @@ namespace MarketplaceOutsourcing.Api.Controllers;
 public class JobsController : ControllerBase
 {
     private readonly JobService _jobService;
+    private readonly ICurrentUserService _currentUser;
 
-    public JobsController(JobService jobService)
+    public JobsController(JobService jobService, ICurrentUserService currentUser)
     {
         _jobService = jobService;
+        _currentUser = currentUser;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public ActionResult<IEnumerable<JobResponse>> GetAll()
     {
@@ -23,6 +29,7 @@ public class JobsController : ControllerBase
         return Ok(jobs);
     }
 
+    [AllowAnonymous]
     [HttpGet("search/{searchTerm}")]
     public ActionResult<IEnumerable<JobResponse>> SearchOpen(string searchTerm)
     {
@@ -35,6 +42,7 @@ public class JobsController : ControllerBase
         return Ok(jobs);
     }
 
+    [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public ActionResult<JobResponse> GetById(Guid id)
     {
@@ -42,13 +50,19 @@ public class JobsController : ControllerBase
         return job is null ? NotFound() : Ok(job.ToResponse());
     }
 
+    [Authorize(Roles = AppRoles.Customer)]
     [HttpPost]
     public ActionResult<JobResponse> Create([FromBody] CreateJobRequest request)
     {
+        if (_currentUser.CustomerId is null)
+        {
+            return Forbid();
+        }
+
         var (success, job, errorMessage) = _jobService.CreateJob(
             request.Title,
             request.Description,
-            request.CustomerId,
+            _currentUser.CustomerId.Value,
             request.StartDate,
             request.DueDate,
             request.Budget);
@@ -61,6 +75,7 @@ public class JobsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = job.Id }, job.ToResponse());
     }
 
+    [Authorize(Roles = AppRoles.Customer)]
     [HttpPut("{id:guid}")]
     public ActionResult<JobResponse> Update(Guid id, [FromBody] UpdateJobRequest request)
     {
@@ -80,6 +95,7 @@ public class JobsController : ControllerBase
         return Ok(job.ToResponse());
     }
 
+    [Authorize(Roles = AppRoles.Customer)]
     [HttpDelete("{id:guid}")]
     public IActionResult Delete(Guid id)
     {

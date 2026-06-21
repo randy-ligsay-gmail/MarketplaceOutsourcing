@@ -39,4 +39,10 @@ public class EfContractorRepository : IContractorRepository
             .OrderBy(c => c.Name)
             .ToList();
     }
+
+    public void Add(Contractor contractor)
+    {
+        _context.Contractors.Add(contractor);
+        _context.SaveChanges();
+    }
 }

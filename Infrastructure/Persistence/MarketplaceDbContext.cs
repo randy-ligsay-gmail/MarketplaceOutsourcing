@@ -14,6 +14,7 @@ public class MarketplaceDbContext : DbContext
     public DbSet<Contractor> Contractors => Set<Contractor>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<JobOffer> JobOffers => Set<JobOffer>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +46,14 @@ public class MarketplaceDbContext : DbContext
             entity.Property(o => o.Price).HasPrecision(18, 2);
             entity.Property(o => o.Status).HasConversion<string>();
             entity.HasIndex(o => o.JobId);
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.Property(u => u.Email).HasMaxLength(256);
+            entity.Property(u => u.PasswordHash).HasMaxLength(500);
+            entity.Property(u => u.Role).HasMaxLength(50);
+            entity.HasIndex(u => u.Email).IsUnique();
         });
     }
 }

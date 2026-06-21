@@ -1,6 +1,8 @@
 using MarketplaceOutsourcing.Api.Dtos;
 using MarketplaceOutsourcing.Api.Mapping;
 using MarketplaceOutsourcing.Application.Services;
+using MarketplaceOutsourcing.Domain.Constants;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MarketplaceOutsourcing.Api.Controllers;
@@ -16,6 +18,7 @@ public class CustomersController : ControllerBase
         _customerService = customerService;
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public ActionResult<IEnumerable<CustomerResponse>> GetAll()
     {
@@ -23,6 +26,7 @@ public class CustomersController : ControllerBase
         return Ok(customers);
     }
 
+    [AllowAnonymous]
     [HttpGet("{searchTerm}")]
     public ActionResult<IEnumerable<CustomerResponse>> Search(string searchTerm)
     {
@@ -35,6 +39,7 @@ public class CustomersController : ControllerBase
         return Ok(customers);
     }
 
+    [Authorize(Roles = AppRoles.Admin)]
     [HttpPost]
     public ActionResult<CustomerResponse> Create([FromBody] CreateCustomerRequest request)
     {

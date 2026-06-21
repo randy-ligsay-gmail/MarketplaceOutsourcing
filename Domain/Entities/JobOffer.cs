@@ -71,5 +71,5 @@ public class JobOffer : BaseEntity
         Price = price;
     }
 
-    public string GetDetail() => $"{Id} | job {JobId} | ${Price} | {Status}";
+    public string GetDetail() => $"{Id} | job {JobId} | {CurrencyFormatter.Format(Price)} | {Status}";
 }

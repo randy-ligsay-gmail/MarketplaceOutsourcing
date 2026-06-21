@@ -9,7 +9,6 @@ public record JobOfferResponse(
 
 public record CreateJobOfferRequest(
     Guid JobId,
-    Guid ContractorId,
     decimal Price);
 
 public record UpdateJobOfferRequest(

@@ -100,6 +100,6 @@ public class Job : BaseEntity
     public string GetDetail()
     {
         var acceptedBy = AcceptedContractorId?.ToString() ?? "none";
-        return $"{Id} | {Title} | ${Budget} | {Status} | accepted by {acceptedBy} | due {DueDate:yyyy-MM-dd}";
+        return $"{Id} | {Title} | {CurrencyFormatter.Format(Budget)} | {Status} | accepted by {acceptedBy} | due {DueDate:yyyy-MM-dd}";
     }
 }

@@ -14,7 +14,6 @@ public record JobResponse(
 public record CreateJobRequest(
     string Title,
     string Description,
-    Guid CustomerId,
     DateTime StartDate,
     DateTime DueDate,
     decimal Budget);
